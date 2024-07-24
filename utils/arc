@@ -1,0 +1,19 @@
+real_estate_bot/
+├── main.py
+├── config.py
+├── handlers/
+│   ├── __init__.py
+│   ├── common.py
+│   ├── comments.py
+│   ├── owners.py
+├── database/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── queries.py
+├── keyboards/
+│   ├── __init__.py
+│   ├── inline.py
+│   ├── reply.py
+└── utils/
+    ├── __init__.py
+    ├── misc.py
