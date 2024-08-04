@@ -53,31 +53,61 @@ def get_properties_buttons(properties, current_page=0):
     
     return builder.as_markup()
 
+from aiogram.types import InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 def get_owners_buttons(owners):
     builder = InlineKeyboardBuilder()
+
     for owner in owners:
-        text = f"ФИО: {owner[2]}, Доля: {owner[4]}"
-        builder.add(InlineKeyboardButton(text=text, callback_data=f"owner_{owner[0]}"))
+        try:
+            # Извлечение данных из кортежа
+            owner_id = owner[0]  # ID владельца
+            fio = owner[2]       # ФИО владельца
+            share = owner[4]     # Доля владельца
+
+            # Формируем текст для кнопки
+            text = f"ФИО: {fio}, Доля: {share} м²"
+            callback_data = f"owner_{owner_id}"
+
+            # Добавляем кнопку в клавиатуру
+            builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
+        except IndexError as e:
+            print(f"IndexError: {e} - owner data: {owner}")
+        except Exception as e:
+            print(f"Exception: {e} - owner data: {owner}")
+
     builder.add(InlineKeyboardButton(text="Оставить общий комментарий", callback_data="comment_general"))
     builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
     builder.add(InlineKeyboardButton(text="Вернуться к выбору адреса", callback_data="back_to_houses"))
+
     builder.adjust(1)
+
     return builder.as_markup()
 
+
 def get_back_button():
-    button = InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties")
-    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору адреса", callback_data="back_to_houses"))
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
+    builder.add(InlineKeyboardButton(text="Вернуться к активной квартире", callback_data="back"))
+    builder.adjust(1)
+    return builder.as_markup()
 
 def get_comment_buttons(property_info):
     builder = InlineKeyboardBuilder()
-    for idx, owner in enumerate(property_info['owners'], start=1):
-        builder.add(InlineKeyboardButton(text=f"Оставить комментарий собственник {idx}", callback_data=f"comment_owner_{idx}"))
+    
+    for owner in property_info['owners']:
+        fio = owner['fio']
+        owner_id = owner.get('id', None)
+        text = f"Оставить комментарий для: {fio}"
+        callback_data = f"comment_owner_{owner_id}" if owner_id is not None else f"comment_owner_unknown"
+        builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
+    
     builder.add(InlineKeyboardButton(text="Оставить комментарий общий", callback_data="comment_general"))
     builder.add(InlineKeyboardButton(text="Вернуться к выбору адреса", callback_data="back_to_houses"))
     builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
-    builder.adjust(1)
-    return builder.as_markup()
 
-def get_back_button():
-    button = InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties")
-    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+    builder.adjust(1)
+
+    return builder.as_markup()

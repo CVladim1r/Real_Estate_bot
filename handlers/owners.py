@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import logging
 
-from database.queries import get_all_properties, get_owners_by_property_id, get_property_by_number
+from database.queries import save_active_property_id_db, get_all_properties, get_owners_by_property_id, get_property_by_number
 from keyboards.inline import get_properties_buttons, get_owners_buttons
 
 router = Router()
@@ -31,8 +31,7 @@ async def select_property(call: types.CallbackQuery, state: FSMContext):
     try:
         property_id = int(call.data.split("_")[1])
         logger.debug(f"Selected property ID: {property_id}")
-        
-        # Fetch property info from the database
+        save_active_property_id_db(call.message.from_user.id, property_id)
         property_info = get_property_by_number(property_id)
         logger.debug(f"Fetched property info: {property_info}")
 
@@ -40,20 +39,24 @@ async def select_property(call: types.CallbackQuery, state: FSMContext):
             await call.message.answer("Квартира не найдена. Попробуйте снова.")
             return
 
-        # Generate response text
         response_text = (
-            f"Номер помещения: {property_info['id']}\n"
-            f"Площадь: {property_info['area']} кв.м.\n"
-            f"ФИО собственников: {', '.join([owner['fio'] for owner in property_info['owners']])}\n"
-            f"Дата рождения: {', '.join([owner['birth_date'].strftime('%d.%m.%Y') if owner['birth_date'] else 'неизвестно' for owner in property_info['owners']])}\n"
-            f"Назначение помещения: {property_info['type']}\n"
-            f"Доля: {', '.join([str(owner['share']) for owner in property_info['owners']])}\n"
-            f"Комментарий: {property_info['general_comment'] or 'нет комментария'}\n"
+            f"**Номер помещения:** {property_info['number']}\n"
+            f"**Площадь:** {property_info['area']} кв.м.\n"
+            f"**Тип помещения:** {property_info['type']}\n"
+            f"**Форма собственности:** {property_info['ownership_form']}\n"
+            f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+            f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
+            f"**Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
+            f"**Собственники:**\n"
+            + '\n'.join(
+                f" - {owner['fio']}, дата рождения: {owner['birth_date'].strftime('%d.%m.%Y')}, доля: {owner['share']}м/кв2"
+                for owner in property_info['owners']
+            )
         )
-        logger.debug(f"Generated response text for property info: {response_text}")
-        await call.message.answer(response_text)
 
-        # Fetch owners from the database
+        logger.debug(f"Generated response text for property info: {response_text}")
+        await call.message.answer(response_text, parse_mode='Markdown')
+
         owners = get_owners_by_property_id(property_id)
         logger.debug(f"Fetched owners: {owners}")
         if not owners:
@@ -68,7 +71,6 @@ async def select_property(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer("Произошла ошибка при обработке выбора квартиры. Попробуйте снова.")
 
 def register_owner_handlers(router: Router):
-    router.message.register(start_command, Command("start"))
     router.callback_query.register(select_property, lambda call: call.data.startswith("property_"))
 
 register_owner_handlers(router)
