@@ -4,9 +4,10 @@ from aiogram.types import BotCommand
 from handlers.common import router as common_router
 from handlers.comments import router as comments_router
 from handlers.owners import router as owners_router
+from config import config_data
 
 async def main():
-    bot = Bot(token="6848117166:AAGFRETuXNKKEABXp7opzvIzm5yDT6wN_GU")
+    bot = Bot(token=config_data.TOKEN)
     dp = Dispatcher()
 
     dp.include_router(common_router)
@@ -15,7 +16,8 @@ async def main():
 
     await bot.set_my_commands([
         BotCommand(command="/start", description="Запустить бота"),
-        BotCommand(command="/info", description="Информация о боте")
+        #BotCommand(command="/info", description="Информация о боте")
+        #BotCommand(command="/search", description="Поиск обьекта")
     ])
 
     await dp.start_polling(bot)

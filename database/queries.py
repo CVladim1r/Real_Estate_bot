@@ -1,21 +1,22 @@
 import mysql.connector
 from mysql.connector import Error
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 from datetime import datetime, timedelta
 import string
 import random
 import threading
 import logging
+
+from config import config_data
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-
 def get_connection():
     return mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
+        host=config_data.DB_HOST,
+        user=config_data.DB_USER,
+        password=config_data.DB_PASSWORD,
+        database=config_data.DB_NAME
     )
     
 def execute_query(query, params=None, fetchone=False):
@@ -347,7 +348,6 @@ def get_property_by_number(property_id):
         result = cursor.fetchone()
 
         if result:
-            # Обработка информации о владельцах
             owners = []
             if result['owners']:
                 owner_entries = result['owners'].split(';')

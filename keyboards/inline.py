@@ -65,11 +65,9 @@ def get_owners_buttons(owners):
             fio = owner[2]  
             share = owner[4] 
 
-            # Формируем текст для кнопки
             text = f"ФИО: {fio}, Доля: {share} м²"
             callback_data = f"owner_{owner_id}"
 
-            # Добавляем кнопку в клавиатуру
             builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
         except IndexError as e:
             print(f"IndexError: {e} - owner data: {owner}")

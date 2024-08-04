@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import StateFilter
 import logging
+
 from database.queries import insert_comment, get_comments_by_property_id, get_properties_by_house_id
 from keyboards.inline import get_owners_buttons, get_comment_buttons, get_properties_buttons, get_back_button
 

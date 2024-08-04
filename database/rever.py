@@ -30,13 +30,11 @@ def generate_sql(df):
         else:
             area = f"{area:.2f}"
 
-        # Преобразуем номер в целое число
         try:
             number = int(number)
         except (ValueError, TypeError):
             number = 'NULL'
 
-        # Если номер помещения еще не был обработан, добавляем его в список свойств
         if number != 'NULL' and number not in property_id_mapping:
             property_id = next_property_id
             property_id_mapping[number] = property_id
