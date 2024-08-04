@@ -55,6 +55,52 @@ def load_active_property_id_db(user_id):
         return user_id, result['property_id']
     return None, None
 
+def update_user_state(user_id, last_house_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+            INSERT INTO user_state (user_id, last_house_id) 
+            VALUES (%s, %s) 
+            ON DUPLICATE KEY UPDATE last_house_id = %s
+        """
+        values = (user_id, last_house_id, last_house_id)
+
+        cursor.execute(query, values)
+        connection.commit()
+        print(f"Updated user state for user {user_id} with last house ID {last_house_id}.")
+    except Error as e:
+        print(f"Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def get_user_last_house(user_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = "SELECT last_house_id FROM user_state WHERE user_id = %s"
+        cursor.execute(query, (user_id,))
+        result = cursor.fetchone()
+
+        if result:
+            last_house_id = result[0]
+            print(f"Retrieved last house ID for user {user_id}: {last_house_id}")
+            return last_house_id
+        else:
+            print(f"No house ID found for user {user_id}.")
+            return None
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
 
 def token_cleanup():
     try:

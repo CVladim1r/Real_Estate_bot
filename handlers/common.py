@@ -9,7 +9,7 @@ import logging
 import json
 from .file import *
 from keyboards.inline import get_back_button, get_houses_buttons, get_properties_buttons, get_comment_buttons, get_owners_buttons
-from database.queries import load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
+from database.queries import update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
 
 router = Router()
 
@@ -72,6 +72,8 @@ async def token_command(message: types.Message, state: FSMContext):
 async def process_house_selection(callback_query: types.CallbackQuery, state: FSMContext):
     house_id = int(callback_query.data.split("_")[1])
     properties = get_properties_by_house_id(house_id)
+    user_id = callback_query.message.from_user.id
+    update_user_state(user_id, house_id)
     logger.debug(f"Selected house ID: {house_id}, fetched properties: {properties}")
     await state.update_data(house_id=house_id, properties=properties, current_page=0)
     await state.set_state(PropertyState.selecting_property)
@@ -129,10 +131,11 @@ async def process_property_number(message: types.Message, state: FSMContext):
         f"**Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner['fio']}, дата рождения: {owner['birth_date'].strftime('%d.%m.%Y')}, доля: {owner['share']}м/кв2"
+            f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y') if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2"
             for owner in owners
         )
     )
+    await state.update_data(property_number=property_number, property_info=property_info, active_property_id=property_id)
 
     await message.answer(response_text, parse_mode='Markdown')
     await state.set_state(PropertyState.showing_property_info)
@@ -252,7 +255,11 @@ async def back_to_houses(callback_query: types.CallbackQuery, state: FSMContext)
 @router.callback_query(lambda call: call.data == 'back_to_properties')
 async def back_to_properties(callback_query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    house_id = data.get("house_id")
+    user_id = callback_query.message.from_user.id
+    house_id = get_user_last_house(user_id)
+    if not house_id:
+        house_id = get_user_last_house(user_id)
+    
     properties = get_properties_by_house_id(house_id)
     logger.debug(f"Returning to property selection for house ID: {house_id}, fetched properties: {properties}")
     await state.set_state(PropertyState.selecting_property)
@@ -272,20 +279,45 @@ async def paginate_houses(callback_query: types.CallbackQuery, state: FSMContext
 async def paginate_properties(callback_query: types.CallbackQuery, state: FSMContext):
     try:
         data = await state.get_data()
+        user_id = callback_query.message.from_user.id
         current_page = data.get("current_page", 0)
         house_id = data.get("house_id")
+
+        if not house_id:
+            house_id = get_user_last_house(user_id)
+            await state.update_data(house_id=house_id)
+
         properties = get_properties_by_house_id(house_id)
         
+        if properties is None:
+            properties = []
+
         if callback_query.data.startswith("properties_next_"):
             current_page += 1
         elif callback_query.data.startswith("properties_prev_"):
             current_page -= 1
 
-        logger.debug(f"Paginating properties, current page: {current_page}, properties range: {properties[current_page * 5 : (current_page + 1) * 5]}")
+        num_properties = len(properties)
+        total_pages = (num_properties + 47) // 48  
+        
+        if current_page < 0:
+            current_page = 0
+        elif current_page >= total_pages:
+            current_page = total_pages - 1
+
         await state.update_data(current_page=current_page)
+
+        start_index = current_page * 48
+        end_index = (current_page + 1) * 48
+        properties_page = properties[start_index:end_index]
+
+
         await callback_query.message.edit_reply_markup(reply_markup=get_properties_buttons(properties, current_page))
+
     except Exception as e:
         logger.error(f"Error paginating properties: {e}")
+        await callback_query.message.answer("Произошла ошибка при обработке запроса.")
+
 
 def register_common_handlers(router: Router):
     router.message.register(start_command, Command("start"))

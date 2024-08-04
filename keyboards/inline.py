@@ -38,7 +38,7 @@ def get_comment_buttons(property_info):
 def get_properties_buttons(properties, current_page=0):
     builder = InlineKeyboardBuilder()
     
-    for prop in properties[current_page*50:(current_page+1)*48]:
+    for prop in properties[current_page*48:(current_page+1)*48]:
         text = f"Кв. {prop[2]}"
         builder.add(InlineKeyboardButton(text=text, callback_data=f"property_{prop[0]}"))
     
@@ -61,10 +61,9 @@ def get_owners_buttons(owners):
 
     for owner in owners:
         try:
-            # Извлечение данных из кортежа
-            owner_id = owner[0]  # ID владельца
-            fio = owner[2]       # ФИО владельца
-            share = owner[4]     # Доля владельца
+            owner_id = owner[0]
+            fio = owner[2]  
+            share = owner[4] 
 
             # Формируем текст для кнопки
             text = f"ФИО: {fio}, Доля: {share} м²"
