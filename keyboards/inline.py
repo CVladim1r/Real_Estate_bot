@@ -2,55 +2,82 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 
-# Настройка логирования
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-def get_houses_buttons(houses):
-    builder = InlineKeyboardBuilder()
-    logger.debug("Creating house buttons with houses: %s", houses)
-    for house in houses:
-        text = f"Дом: {house[1]}"  # Предполагаем, что house[1] это адрес дома
-        logger.debug("Adding button with text: %s", text)
-        builder.add(InlineKeyboardButton(text=text, callback_data=f"house_{house[0]}"))
-    keyboard = builder.as_markup()
-    logger.info("House buttons created successfully.")
-    return keyboard
+PROPERTIES_PER_PAGE = 50
 
-def get_properties_buttons(properties):
+def get_houses_buttons(houses, current_page=0):
+    buttons = []
+    for house in houses[current_page*5:(current_page+1)*5]:
+        buttons.append([InlineKeyboardButton(text=house[1], callback_data=f"house_{house[0]}")])
+
+    pagination_buttons = []
+    if current_page > 0:
+        pagination_buttons.append(InlineKeyboardButton(text="Назад", callback_data=f"page_{current_page-1}"))
+    if (current_page + 1) * 5 < len(houses):
+        pagination_buttons.append(InlineKeyboardButton(text="Вперед", callback_data=f"page_{current_page+1}"))
+
+    if pagination_buttons:
+        buttons.append(pagination_buttons)
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_comment_buttons(property_info):
+    buttons = [
+        [InlineKeyboardButton(text="Добавить комментарий", callback_data="comment_general")],
+    ]
+    for i, owner in enumerate(property_info['owners'], start=1):
+        buttons.append([InlineKeyboardButton(text=f"Комментарий владельцу {i}", callback_data=f"comment_owner_{i}")])
+
+    buttons.append([InlineKeyboardButton(text="Назад к квартирам", callback_data="back_to_properties")])
+    buttons.append([InlineKeyboardButton(text="Назад к домам", callback_data="back_to_houses")])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_properties_buttons(properties, current_page=0):
     builder = InlineKeyboardBuilder()
-    logger.debug("Creating property buttons with properties: %s", properties)
-    for prop in properties:
-        # Формируем текст кнопки, предполагая, что prop[2] это номер квартиры, prop[3] площадь, prop[4] дополнительная информация
-        text = f"Квартира {prop[2]} - {prop[3]} м², {prop[4]}"
-        logger.debug("Adding button with text: %s", text)
-        # Добавляем кнопку
+    
+    for prop in properties[current_page*50:(current_page+1)*48]:
+        text = f"Кв. {prop[2]}"
         builder.add(InlineKeyboardButton(text=text, callback_data=f"property_{prop[0]}"))
-    keyboard = builder.as_markup()
-    logger.info("Property buttons created successfully.")
-    return keyboard
+    
+    builder.adjust(4)
+    
+    if current_page > 0:
+        builder.add(InlineKeyboardButton(text="Назад", callback_data=f"properties_prev_{current_page-1}"))
+    if (current_page + 1) * 48 < len(properties):
+        builder.add(InlineKeyboardButton(text="Вперед", callback_data=f"properties_next_{current_page+1}"))
+    
+    builder.adjust(4)
+    
+    return builder.as_markup()
 
 def get_owners_buttons(owners):
     builder = InlineKeyboardBuilder()
-    logger.debug("Creating owner buttons with owners: %s", owners)
     for owner in owners:
-        text = f"ФИО: {owner[2]}, Доля: {owner[4]}"  # Предполагаем, что owner[2] это ФИО жильца и owner[4] это доля
-        logger.debug("Adding button with text: %s", text)
+        text = f"ФИО: {owner[2]}, Доля: {owner[4]}"
         builder.add(InlineKeyboardButton(text=text, callback_data=f"owner_{owner[0]}"))
-    keyboard = builder.as_markup()
-    logger.info("Owner buttons created successfully.")
-    return keyboard
+    builder.add(InlineKeyboardButton(text="Оставить общий комментарий", callback_data="comment_general"))
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору адреса", callback_data="back_to_houses"))
+    builder.adjust(1)
+    return builder.as_markup()
 
-def get_comment_buttons(comments):
+def get_back_button():
+    button = InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties")
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+
+def get_comment_buttons(property_info):
     builder = InlineKeyboardBuilder()
-    logger.debug("Creating comment buttons with comments: %s", comments)
-    for comment in comments:
-        if len(comment) > 0:  # Проверяем, что comment содержит элементы
-            text = f"Комментарий ID {comment[0]}: {comment[1]}"  # Преобразуем значение в строку и добавляем текст комментария
-            logger.debug("Adding button for comment ID: %s", text)
-            builder.add(InlineKeyboardButton(text=text, callback_data=f"comment_{comment[0]}"))  # Используем callback_data
-        else:
-            logger.warning("Comment list is empty or does not contain expected elements: %s", comment)
-    keyboard = builder.as_markup()
-    logger.info("Comment buttons created successfully.")
-    return keyboard
+    for idx, owner in enumerate(property_info['owners'], start=1):
+        builder.add(InlineKeyboardButton(text=f"Оставить комментарий собственник {idx}", callback_data=f"comment_owner_{idx}"))
+    builder.add(InlineKeyboardButton(text="Оставить комментарий общий", callback_data="comment_general"))
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору адреса", callback_data="back_to_houses"))
+    builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
+    builder.adjust(1)
+    return builder.as_markup()
+
+def get_back_button():
+    button = InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties")
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
