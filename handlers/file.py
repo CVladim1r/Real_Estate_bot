@@ -2,11 +2,9 @@ import json
 import os
 import logging
 
-# Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Путь к файлу
 ACTIVE_PROPERTY_FILE = os.path.join(os.path.dirname(__file__), 'active_property.json')
 
 def save_active_property_id(user_id, property_id):

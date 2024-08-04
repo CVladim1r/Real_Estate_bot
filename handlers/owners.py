@@ -42,16 +42,16 @@ async def select_property(call: types.CallbackQuery, state: FSMContext):
         response_text = (
             f"**Номер помещения:** {property_info['number']}\n"
             f"**Площадь:** {property_info['area']} кв.м.\n"
+            #f"**Форма собственности:** {property_info['ownership_form']}\n"
+            #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+            #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
             f"**Тип помещения:** {property_info['type']}\n"
-            f"**Форма собственности:** {property_info['ownership_form']}\n"
-            f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-            f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
-            f"**Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
             f"**Собственники:**\n"
             + '\n'.join(
                 f" - {owner['fio']}, дата рождения: {owner['birth_date'].strftime('%d.%m.%Y')}, доля: {owner['share']}м/кв2"
                 for owner in property_info['owners']
             )
+            + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
         )
 
         logger.debug(f"Generated response text for property info: {response_text}")

@@ -82,8 +82,8 @@ def process_files(file_paths):
     all_properties_sql = ""
     all_owners_sql = ""
     
-    house_id = 1  # Start house_id from 1
-    next_property_id = 1  # Start property_id from 1
+    house_id = 1
+    next_property_id = 1
 
     for file_path in file_paths:
         df = read_excel(file_path)
@@ -91,7 +91,7 @@ def process_files(file_paths):
         all_properties_sql += properties_sql + "\n"
         all_owners_sql += owners_sql + "\n"
         
-        house_id += 1  # Increment house_id for each file
+        house_id += 1
 
     return all_properties_sql, all_owners_sql
 
@@ -111,17 +111,14 @@ def main():
         'Самаркандский_бульв_,_квартал_134а_д_корп_2.xlsx',
         'Самаркандский_бульв_,_квартал_137а_д_корп_9.xlsx',
         'Хлобыстова ул. д.18 корп.1.xlsx'
-    ]  # Add more file paths as needed
+    ]
     
     all_properties_sql, all_owners_sql = process_files(file_paths)
     
-    # Combine the SQL queries into one final output
     final_sql = all_properties_sql + "\n" + all_owners_sql
     
-    # Save the combined SQL to a file
     save_sql_to_file(final_sql, 'combined_properties_and_owners.sql')
     
-    # Print the combined SQL for owners
     print(all_owners_sql)
 
 if __name__ == "__main__":

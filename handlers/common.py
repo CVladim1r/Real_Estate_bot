@@ -125,15 +125,15 @@ async def process_property_number(message: types.Message, state: FSMContext):
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
-        f"**Форма собственности:** {property_info['ownership_form']}\n"
-        f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
-        f"**Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
+        #f"**Форма собственности:** {property_info['ownership_form']}\n"
+        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
             f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y') if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2"
             for owner in owners
         )
+        + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
     )
     await state.update_data(property_number=property_number, property_info=property_info, active_property_id=property_id)
 
@@ -161,15 +161,15 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
-        f"**Форма собственности:** {property_info['ownership_form']}\n"
-        f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
-        f"**Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
+        #f"**Форма собственности:** {property_info['ownership_form']}\n"
+        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
             f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y')}, доля: {owner[4]}м/кв2"
             for owner in owners
         )
+        + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
     )
 
     await callback_query.message.answer(response_text, parse_mode='Markdown')
@@ -216,27 +216,27 @@ async def process_comment(message: types.Message, state: FSMContext):
             return
 
         response_text = (
-            f"📦 **Номер помещения:** {property_info['number']}\n"
-            f"📏 **Площадь:** {property_info['area']} кв.м.\n"
-            f"🏢 **Тип помещения:** {property_info['type']}\n"
-            f"📝 **Форма собственности:** {property_info['ownership_form']}\n"
-            f"🔢 **Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-            f"📄 **Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
-            f"🗒️ **Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n\n"
-            f"👤 **Собственник {owner_index + 1}:**\n"
+            f"**Номер помещения:** {property_info['number']}\n"
+            f"**Площадь:** {property_info['area']} кв.м.\n"
+            f"**Тип помещения:** {property_info['type']}\n"
+            #f"**Форма собственности:** {property_info['ownership_form']}\n"
+            #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+            #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
+            f"**Собственник {owner_index + 1}:**\n"
             f" - {owners[owner_index]['fio']}, дата рождения: {owners[owner_index]['birth_date'].strftime('%d.%m.%Y')}, доля: {owners[owner_index]['share']}м/кв2\n\n"
-            f"📌 **Комментарий:** {message.text}"
+            f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n\n"
+            f"**Комментарий:** {message.text}"
         )
     else:
         response_text = (
-            f"📦 **Номер помещения:** {property_info['number']}\n"
-            f"📏 **Площадь:** {property_info['area']} кв.м.\n"
-            f"🏢 **Тип помещения:** {property_info['type']}\n"
-            f"📝 **Форма собственности:** {property_info['ownership_form']}\n"
-            f"🔢 **Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-            f"📄 **Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
-            f"🗒️ **Общий комментарий:** {property_info.get('general_comment', 'Не указан')}\n"
-            f"🗒️ **Комментарий:** {message.text}"
+            f"**Номер помещения:** {property_info['number']}\n"
+            f"**Площадь:** {property_info['area']} кв.м.\n"
+            f"**Тип помещения:** {property_info['type']}\n"
+            #f"**Форма собственности:** {property_info['ownership_form']}\n"
+            #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
+            #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
+            f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
+            f"**Комментарий:** {message.text}"
         )
 
     await message.answer(response_text, parse_mode='Markdown')
@@ -309,6 +309,7 @@ async def paginate_properties(callback_query: types.CallbackQuery, state: FSMCon
 
         start_index = current_page * 48
         end_index = (current_page + 1) * 48
+        
         properties_page = properties[start_index:end_index]
 
 
@@ -317,7 +318,6 @@ async def paginate_properties(callback_query: types.CallbackQuery, state: FSMCon
     except Exception as e:
         logger.error(f"Error paginating properties: {e}")
         await callback_query.message.answer("Произошла ошибка при обработке запроса.")
-
 
 def register_common_handlers(router: Router):
     router.message.register(start_command, Command("start"))
