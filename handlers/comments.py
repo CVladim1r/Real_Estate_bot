@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import StateFilter
 import logging
 
-from database.queries import insert_comment, get_comments_by_property_id, get_properties_by_house_id
+from database.queries import insert_general_comment, insert_comment, get_comments_by_property_id, get_properties_by_house_id
 from keyboards.inline import get_owners_buttons, get_comment_buttons, get_properties_buttons, get_back_button
 
 router = Router()
@@ -35,7 +35,7 @@ async def select_general_comment(call: types.CallbackQuery, state: FSMContext):
         logger.error(f"Error in select_general_comment: {e}")
         await call.message.answer("Произошла ошибка. Попробуйте снова.")
 
-@router.message(StateFilter(CommentState.awaiting_comment))
+@router.message(CommentState.awaiting_comment)
 async def add_comment(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
@@ -43,26 +43,27 @@ async def add_comment(message: types.Message, state: FSMContext):
         property_id = data.get("property_id")
         is_general = data.get("is_general", False)
 
-        if owner_id is None and not is_general:
-            await message.answer("Ошибка: идентификатор владельца не указан.")
-            await state.clear()
-            return
-
         if property_id is None:
             await message.answer("Ошибка: идентификатор объекта недвижимости не указан.")
             await state.clear()
             return
 
-        insert_comment(owner_id, property_id, message.text, is_general)
-        await message.answer("Комментарий добавлен.")
-        
+        if is_general:
+            insert_general_comment(property_id, message.text)
+        else:
+            if owner_id is None:
+                await message.answer("Ошибка: идентификатор владельца не указан.")
+                await state.clear()
+                return
+            insert_comment(owner_id, property_id, message.text, is_general)
 
+        await message.answer("Комментарий добавлен.")
         await message.answer("Что вы хотите сделать дальше?", reply_markup=get_back_button())
         await state.clear()
     except Exception as e:
         logger.error(f"Error in add_comment: {e}")
         await message.answer("Произошла ошибка при добавлении комментария. Попробуйте снова.")
-
+        
 @router.callback_query(lambda call: call.data == 'back_to_properties')
 async def back_to_properties(call: types.CallbackQuery, state: FSMContext):
     try:

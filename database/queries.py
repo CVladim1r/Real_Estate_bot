@@ -244,6 +244,40 @@ def insert_owner(property_id, fio, birth_date, share, comment):
             cursor.close()
             connection.close()
 
+def get_general_comment_by_property_id(property_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        
+        query = "SELECT general_comment FROM properties WHERE id = %s"
+        cursor.execute(query, (property_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            return result.get('general_comment', 'Отсутсвует')
+        else:
+            return 'Отсутсвует'
+    except Error as e:
+        print(f"Error: {e}")
+        return 'Отсутсвует'
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def insert_general_comment(property_id, comment):
+    query = """
+    UPDATE properties
+    SET general_comment = %s
+    WHERE id = %s
+    """
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(query, (comment, property_id))
+    connection.commit()
+
+
 def insert_comment(owner_id, property_id, comment, is_general):
     connection = None
     cursor = None
@@ -336,7 +370,7 @@ def get_property_by_number(property_id):
         query = """
         SELECT p.id, p.number, p.area, p.type, p.ownership_form, p.cadastral_number, 
                p.ownership_doc, p.general_comment, GROUP_CONCAT(
-                   CONCAT(o.fio, '|', o.birth_date, '|', o.share)
+                   CONCAT(o.fio, '|', IFNULL(o.birth_date, 'неизвестно'), '|', o.share, '|', IFNULL(o.comment, 'Отсутсвует'))
                    SEPARATOR ';'
                ) AS owners
         FROM properties p
@@ -352,16 +386,17 @@ def get_property_by_number(property_id):
             if result['owners']:
                 owner_entries = result['owners'].split(';')
                 for entry in owner_entries:
-                    fio, birth_date, share = entry.split('|')
+                    fio, birth_date, share, comment = entry.split('|')
                     owners.append({
                         'fio': fio,
-                        'birth_date': datetime.strptime(birth_date, '%Y-%m-%d').date(),
-                        'share': float(share)
+                        'birth_date': birth_date if birth_date == 'неизвестно' else datetime.strptime(birth_date, '%Y-%m-%d').date(),
+                        'share': float(share),
+                        'comment': comment
                     })
             result['owners'] = owners
             result['cadastral_number'] = result['cadastral_number'] if result['cadastral_number'] else "Не указано"
             result['ownership_doc'] = result['ownership_doc'] if result['ownership_doc'] else "Не указано"
-            result['general_comment'] = result['general_comment'] if result['general_comment'] else "Не указано"
+            result['general_comment'] = result['general_comment'] if result['general_comment'] else "Отсутсвует"
             
             return result
         else:
@@ -373,6 +408,7 @@ def get_property_by_number(property_id):
         if connection.is_connected():
             cursor.close()
             connection.close()
+
 
 def get_property_by_id(property_id):
     logger.debug(f"Запрос информации о квартире с ID: {property_id}")
