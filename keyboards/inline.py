@@ -64,8 +64,7 @@ def get_owners_buttons(owners):
             owner_id = owner[0]
             fio = owner[2]  
             share = owner[4] 
-
-            text = f"ФИО: {fio}, Доля: {share} м²"
+            text = f"{fio}"
             callback_data = f"owner_{owner_id}"
 
             builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
@@ -97,7 +96,7 @@ def get_comment_buttons(property_info):
     for owner in property_info['owners']:
         fio = owner['fio']
         owner_id = owner.get('id', None)
-        text = f"Оставить комментарий для: {fio}"
+        text = f"{fio}"
         callback_data = f"comment_owner_{owner_id}" if owner_id is not None else f"comment_owner_unknown"
         builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
     

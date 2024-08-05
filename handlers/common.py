@@ -42,10 +42,10 @@ def is_token_valid(user_id, token):
 async def start_command(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     token = get_user_token(user_id)
-    if token is None:
+    if token is None or not token:
         token = register_user(user_id)
         add_user_token(user_id, token)
-    logger.info(f"Generated token for user {user_id}: {token}")
+        logger.info(f"Generated token for user {user_id}: {token}")
     
     await state.update_data(token=token)
     await state.set_state(PropertyState.awaiting_token)
@@ -196,7 +196,6 @@ async def add_comment(message: types.Message, state: FSMContext):
             await state.clear()
             return
 
-        # Вызов функции для вставки общего комментария
         insert_general_comment(property_id, message.text)
 
         await message.answer("Комментарий добавлен.")
