@@ -53,7 +53,7 @@ async def select_property(call: types.CallbackQuery, state: FSMContext):
                 for owner in property_info['owners'] 
             )
             + '\n'
-            + f"**Общий комментарий:** {general_comment}\n"
+            + f"\n**Общий комментарий:** {general_comment}\n"
         )
 
         logger.debug(f"Generated response text for property info: {response_text}")

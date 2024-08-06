@@ -25,6 +25,7 @@ def execute_query(query, params=None, fetchone=False):
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
+        logger.debug(f"Executing query: {query} with params: {params}") 
         cursor.execute(query, params)
         if fetchone:
             result = cursor.fetchone()
@@ -33,7 +34,7 @@ def execute_query(query, params=None, fetchone=False):
         connection.commit()
         return result
     except Error as e:
-        print(f"Error executing query: {e}")
+        logger.error(f"Error executing query: {e}")
         return None
     finally:
         if cursor is not None:
@@ -55,6 +56,39 @@ def load_active_property_id_db(user_id):
     if result:
         return user_id, result['property_id']
     return None, None
+
+
+async def load_active_property_id_db_2(user_id):
+    connection = None
+    cursor = None
+    try:
+        connection = get_connection()
+        if connection is None:
+            raise Error("Failed to establish a database connection.")
+        
+        cursor = connection.cursor()
+
+        query = "SELECT property_id FROM active_properties WHERE user_id = %s;"
+        values = (user_id,)
+
+        cursor.execute(query, values)
+        result = cursor.fetchone()
+
+        if result:
+            property_id = result[0]
+            print(f"Active property ID for user {user_id}: {property_id}")
+            return property_id
+        else:
+            print(f"No active property ID found for user {user_id}.")
+            return None
+    except Error as e:
+        logger.error(f"Error: {e}")
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if connection and connection.is_connected():
+            connection.close()
 
 def update_user_state(user_id, last_house_id):
     try:
@@ -89,18 +123,19 @@ def get_user_last_house(user_id):
 
         if result:
             last_house_id = result[0]
-            print(f"Retrieved last house ID for user {user_id}: {last_house_id}")
+            logger.info(f"Retrieved last house ID for user {user_id}: {last_house_id}")
             return last_house_id
         else:
-            print(f"No house ID found for user {user_id}.")
+            logger.info(f"No house ID found for user {user_id}.")
             return None
     except Error as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         return None
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
+
 
 
 def token_cleanup():
@@ -151,9 +186,17 @@ def add_user_token(user_id, token):
 def get_user_token(user_id):
     try:
         connection = get_connection()
+        if connection is None:
+            print("Failed to connect to the database")
+            return None
+
         cursor = connection.cursor()
 
-        query = "SELECT token FROM user_tokens WHERE user_id = %s AND expires_at > NOW()"
+        query = """
+        SELECT token 
+        FROM user_tokens 
+        WHERE user_id = %s 
+        """
         cursor.execute(query, (user_id,))
         token_info = cursor.fetchone()
 
@@ -168,7 +211,7 @@ def get_user_token(user_id):
         print(f"Error: {e}")
         return None
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
 
@@ -266,31 +309,59 @@ def get_general_comment_by_property_id(property_id):
             connection.close()
 
 def insert_general_comment(property_id, comment):
-    query = """
-    UPDATE properties
-    SET general_comment = %s
-    WHERE id = %s
-    """
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute(query, (comment, property_id))
-    connection.commit()
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        query = """
+        UPDATE properties
+        SET general_comment = CONCAT(IFNULL(general_comment, ''), 
+            CASE
+                WHEN LENGTH(IFNULL(general_comment, '')) > 0 THEN CONCAT(', ', %s)
+                ELSE %s
+            END
+        )
+        WHERE id = %s
+        """
+        cursor.execute(query, (comment, comment, property_id))
+        connection.commit()
+        print("General comment updated successfully.")
+    except Error as e:
+        print(f"Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
 
 
 def insert_comment(owner_id, property_id, comment, is_general):
-    connection = None
-    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor()
 
         if is_general:
-            query = "UPDATE properties SET general_comment = %s WHERE id = %s"
-            cursor.execute(query, (comment, property_id))
+            query = """
+            UPDATE properties
+            SET general_comment = CONCAT(IFNULL(general_comment, ''), 
+                CASE
+                    WHEN LENGTH(IFNULL(general_comment, '')) > 0 THEN CONCAT(', ', %s)
+                    ELSE %s
+                END
+            )
+            WHERE id = %s
+            """
+            cursor.execute(query, (comment, comment, property_id))
         else:
-            query = "UPDATE owners SET comment = %s WHERE id = %s"
-            cursor.execute(query, (comment, owner_id))
+            query = """
+            UPDATE owners
+            SET comment = CONCAT(IFNULL(comment, ''), 
+                CASE
+                    WHEN LENGTH(IFNULL(comment, '')) > 0 THEN CONCAT(', ', %s)
+                    ELSE %s
+                END
+            )
+            WHERE id = %s
+            """
+            cursor.execute(query, (comment, comment, owner_id))
 
         connection.commit()
 
@@ -305,6 +376,7 @@ def insert_comment(owner_id, property_id, comment, is_general):
             cursor.close()
         if connection is not None and connection.is_connected():
             connection.close()
+
             
 def get_all_houses():
     try:
@@ -402,7 +474,7 @@ def get_property_by_number(property_id):
         else:
             return None
     except Error as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         return None
     finally:
         if connection.is_connected():
@@ -413,29 +485,30 @@ def get_property_by_number(property_id):
 def get_property_by_id(property_id):
     logger.debug(f"Запрос информации о квартире с ID: {property_id}")
 
-    try:    
+    try:
         connection = get_connection()
-        cursor = connection.cursor()
+        cursor = connection.cursor(dictionary=True)
         query = """
             SELECT p.id, p.number, p.area, p.type, p.ownership_form, p.cadastral_number, p.ownership_doc, p.general_comment
             FROM properties p
-            WHERE p.id = :property_id
-            """      
-        result = cursor.execute(query, {'property_id': property_id}).fetchone()
+            WHERE p.id = %s
+        """      
+        cursor.execute(query, (property_id,))
+        result = cursor.fetchone()
         if result:
-            property_info = dict(result)
-            logger.debug(f"Информация о квартире: {property_info}")
-            return property_info
+            logger.debug(f"Информация о квартире: {result}")
+            return result
         else:
             logger.debug(f"Квартира с ID: {property_id} не найдена")
             return None
-    except Exception as e:
-            logger.error(f"Ошибка при запросе информации о квартире с ID: {property_id}: {e}")
-            return None
+    except Error as e:
+        logger.error(f"Ошибка при запросе информации о квартире с ID: {property_id}: {e}")
+        return None
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
+
 
 
 def get_owners_by_property_id(property_id):
@@ -511,6 +584,50 @@ def get_properties_by_type(property_type):
         return properties
     except Error as e:
         print(f"Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def save_last_owner_for_user(user_id, owner_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO user_last_owner (user_id, last_owner_id)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE last_owner_id = %s;
+        """
+        cursor.execute(query, (user_id, owner_id, owner_id))
+        connection.commit()
+        print(f"Last owner ID {owner_id} saved for user ID {user_id}.")
+    except Error as e:
+        print(f"Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def get_last_owner_for_user(user_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = "SELECT last_owner_id FROM user_last_owner WHERE user_id = %s;"
+        cursor.execute(query, (user_id,))
+        result = cursor.fetchone()
+
+        if result and result['last_owner_id']:
+            last_owner_id = result['last_owner_id']
+            print(f"Last owner ID for user {user_id}: {last_owner_id}")
+            return last_owner_id
+        else:
+            print(f"No last owner found for user ID {user_id}.")
+            return None
+    except Error as e:
+        print(f"Error: {e}")
+        return None
     finally:
         if connection.is_connected():
             cursor.close()
