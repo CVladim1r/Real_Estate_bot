@@ -167,7 +167,6 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
         + '\n'
         + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутствует')}\n"
     )
-
     await callback_query.message.answer(response_text, parse_mode='Markdown')
     await state.set_state(PropertyState.showing_property_info)
     await callback_query.message.answer("Выберите действие:", reply_markup=get_comment_buttons(property_info))
