@@ -8,7 +8,7 @@ from aiogram.filters import StateFilter
 
 from .file import *
 from keyboards.inline import get_back_button, get_houses_buttons, get_properties_buttons, get_comment_buttons, get_owners_buttons
-from database.queries import insert_general_comment, update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
+from database.queries import save_properties_by_user_id, update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
 
 router = Router()
 
@@ -19,6 +19,7 @@ class PropertyState(StatesGroup):
     awaiting_comment = State()
     awaiting_token = State()
     active_property_id = State()
+    selecting_owner = State()
 
 user_tokens = {}
 
@@ -93,8 +94,6 @@ async def process_house_address(message: types.Message, state: FSMContext):
     else:
         await message.answer("Дом не найден. Попробуйте снова.")
 
-
-
 @router.message(PropertyState.selecting_property)
 async def process_property_number(message: types.Message, state: FSMContext):
     property_number = message.text
@@ -110,10 +109,10 @@ async def process_property_number(message: types.Message, state: FSMContext):
     logger.debug(f"Fetched property info: {property_info}")
 
     user_id = message.from_user.id
-    save_active_property_id_db(user_id, property_id)
+    save_properties_by_user_id(user_id, property_id)  # Save the property for the user
 
     await state.update_data(property_number=property_number, property_info=property_info, active_property_id=property_id)
-    save_active_property_id(user_id, property_id)
+    save_active_property_id_db(user_id, property_id)  # This might be redundant if save_properties_by_user_id already handles it
     logger.debug(f"State updated with active_property_id: {property_id}")
 
     owners = get_owners_by_property_id(property_id)
@@ -126,9 +125,6 @@ async def process_property_number(message: types.Message, state: FSMContext):
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
-        #f"**Форма собственности:** {property_info['ownership_form']}\n"
-        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
             f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y') if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
@@ -168,7 +164,7 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
         #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y')}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
+            f" - {owner[2]}, дата рождения: {owner[3]}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
             for owner in owners
         )
         + '\n'
@@ -185,31 +181,10 @@ async def process_comment_selection(callback_query: types.CallbackQuery, state: 
     await state.set_state(PropertyState.awaiting_comment)
     await callback_query.message.answer("Введите ваш комментарий:")
 
-@router.message(PropertyState.awaiting_comment)
-async def add_comment(message: types.Message, state: FSMContext):
-    try:
-        data = await state.get_data()
-        property_id = data.get("property_id")
-
-        if property_id is None:
-            await message.answer("Ошибка: идентификатор объекта недвижимости не указан.")
-            await state.clear()
-            return
-
-        insert_general_comment(property_id, message.text)
-
-        await message.answer("Комментарий добавлен.")
-        await message.answer("Что вы хотите сделать дальше?", reply_markup=get_back_button())
-        await state.clear()
-    except Exception as e:
-        logger.error(f"Error in add_comment: {e}")
-        await message.answer("Произошла ошибка при добавлении комментария. Попробуйте снова.")
-
 @router.callback_query(lambda call: call.data == 'back_to_houses')
 async def back_to_houses(callback_query: types.CallbackQuery, state: FSMContext):
     houses = get_all_houses()
     logger.debug(f"Returning to house selection, fetched houses: {houses}")
-    await state.clear()
     await state.set_state(PropertyState.selecting_house)
     await callback_query.message.edit_text("Выберите дом или введите адрес:", reply_markup=get_houses_buttons(houses))
 

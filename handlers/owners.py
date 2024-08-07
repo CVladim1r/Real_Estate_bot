@@ -7,14 +7,12 @@ import logging
 from database.queries import get_general_comment_by_property_id, save_active_property_id_db, get_all_properties, get_owners_by_property_id, get_property_by_number
 from keyboards.inline import get_properties_buttons, get_owners_buttons
 
+from .common import PropertyState
+
 router = Router()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-class PropertyState(StatesGroup):
-    selecting_property = State()
-    showing_property_info = State()
-    selecting_owner = State()
 
 @router.message(Command("start"))
 async def start_command(message: types.Message, state: FSMContext):

@@ -265,47 +265,87 @@ def get_general_comment_by_property_id(property_id):
             cursor.close()
             connection.close()
 
-def insert_general_comment(property_id, comment):
-    query = """
-    UPDATE properties
-    SET general_comment = %s
-    WHERE id = %s
-    """
-    connection = get_connection()
-    cursor = connection.cursor()
+def insert_general_comment(property_id, new_comment):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
 
-    cursor.execute(query, (comment, property_id))
-    connection.commit()
+        # Fetch existing general comment
+        cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
+        result = cursor.fetchone()
+        
+        existing_comment = result[0] if result else ""
+        
+        # Append the new comment to the existing comment
+        if existing_comment:
+            updated_comment = existing_comment + ", " + new_comment
+        else:
+            updated_comment = new_comment
+        
+        # Update the property with the new combined comment
+        query = """
+        UPDATE properties
+        SET general_comment = %s
+        WHERE id = %s
+        """
+        cursor.execute(query, (updated_comment, property_id))
+        connection.commit()
+
+        print("General comment updated successfully.")
+    except Error as e:
+        print(f"Error in insert_general_comment: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
 
 
-def insert_comment(owner_id, property_id, comment, is_general):
-    connection = None
-    cursor = None
+
+def insert_comment(owner_id, property_id, new_comment, is_general):
     try:
         connection = get_connection()
         cursor = connection.cursor()
 
         if is_general:
+            cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
+            result = cursor.fetchone()
+            
+            existing_comment = result[0] if result else ""
+            
+            if existing_comment:
+                updated_comment = existing_comment + ", " + new_comment
+            else:
+                updated_comment = new_comment
+            
             query = "UPDATE properties SET general_comment = %s WHERE id = %s"
-            cursor.execute(query, (comment, property_id))
+            cursor.execute(query, (updated_comment, property_id))
         else:
+            cursor.execute("SELECT comment FROM owners WHERE id = %s", (owner_id,))
+            result = cursor.fetchone()
+            
+            existing_comment = result[0] if result else ""
+            
+            if existing_comment:
+                updated_comment = existing_comment + ", " + new_comment
+            else:
+                updated_comment = new_comment
+            
             query = "UPDATE owners SET comment = %s WHERE id = %s"
-            cursor.execute(query, (comment, owner_id))
+            cursor.execute(query, (updated_comment, owner_id))
 
         connection.commit()
 
         if cursor.rowcount == 0:
             logger.warning("No rows were affected by the update.")
         else:
-            logger.info("Comment inserted successfully.")
+            logger.info("Comment updated successfully.")
     except Error as e:
         logger.error(f"Error in insert_comment: {e}")
     finally:
-        if cursor is not None:
+        if connection.is_connected():
             cursor.close()
-        if connection is not None and connection.is_connected():
             connection.close()
-            
+
 def get_all_houses():
     try:
         connection = get_connection()
@@ -509,6 +549,53 @@ def get_properties_by_type(property_type):
         properties = cursor.fetchall()
         print(f"Fetched properties of type {property_type}: {properties}")
         return properties
+    except Error as e:
+        print(f"Error: {e}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def get_properties_by_user_id(user_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT property_id
+        FROM active_properties
+        WHERE user_id = %s;
+        """
+        cursor.execute(query, (user_id,))
+        result = cursor.fetchone()
+
+        if result:
+            return result['property_id']
+        else:
+            return None
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+
+def save_properties_by_user_id(user_id, property_id):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO active_properties (user_id, property_id)
+        VALUES (%s, %s)
+        ON DUPLICATE KEY UPDATE property_id = VALUES(property_id);
+        """
+        cursor.execute(query, (user_id, property_id))
+        connection.commit()
+
+        print(f"Property ID {property_id} saved for user ID {user_id}.")
     except Error as e:
         print(f"Error: {e}")
     finally:
