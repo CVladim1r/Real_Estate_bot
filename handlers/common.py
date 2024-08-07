@@ -179,9 +179,8 @@ async def process_comment_selection(callback_query: types.CallbackQuery, state: 
     await callback_query.message.answer("Введите ваш комментарий:")
 
 async def get_last_active_property_id(user_id):
-    saved_user_id, property_id = load_active_property_id_db(user_id)
-    result = await load_active_property_id_db_2(user_id) 
-    return result if result else None
+    result = load_active_property_id_db_2(user_id) 
+    return result
 
 
 @router.message(PropertyState.awaiting_comment)
@@ -189,17 +188,17 @@ async def add_comment(message: types.Message, state: FSMContext):
     try:
         data = await state.get_data()
         property_id = data.get("property_id")
-        saved_user_id, property_id = load_active_property_id_db(user_id)
+        user_id = message.from_user.id
 
         if property_id is None:
-            user_id = message.from_user.id
-            property_id = await get_last_active_property_id(user_id)
+            property_id = load_active_property_id_db_2(user_id) 
 
+            
             if property_id is None:
                 await message.answer("Активный идентификатор собственности не найден.")
                 await message.answer("Что вы хотите сделать дальше?", reply_markup=get_back_button())
                 return
-
+        save_active_property_id_db(user_id, property_id)
         await insert_general_comment(property_id, message.text)
 
         await message.answer("Комментарий добавлен.")

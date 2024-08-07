@@ -63,8 +63,8 @@ CREATE TABLE user_state (
 
 CREATE TABLE user_last_owner (
     user_id INT PRIMARY KEY,
-    last_owner_id INT,
-    FOREIGN KEY (last_owner_id) REFERENCES owner_data(owner_id) ON DELETE SET NULL
+    last_owner_id BIGINT,
+    FOREIGN KEY (last_owner_id) REFERENCES owners(id) ON DELETE SET NULL
 );
 
 

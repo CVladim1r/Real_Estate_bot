@@ -8,7 +8,7 @@ import logging
 
 from config import config_data
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_connection():
@@ -25,7 +25,6 @@ def execute_query(query, params=None, fetchone=False):
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
-        logger.debug(f"Executing query: {query} with params: {params}") 
         cursor.execute(query, params)
         if fetchone:
             result = cursor.fetchone()
@@ -34,7 +33,6 @@ def execute_query(query, params=None, fetchone=False):
         connection.commit()
         return result
     except Error as e:
-        logger.error(f"Error executing query: {e}")
         return None
     finally:
         if cursor is not None:
@@ -58,14 +56,9 @@ def load_active_property_id_db(user_id):
     return None, None
 
 
-async def load_active_property_id_db_2(user_id):
-    connection = None
-    cursor = None
+def load_active_property_id_db_2(user_id):
     try:
         connection = get_connection()
-        if connection is None:
-            raise Error("Failed to establish a database connection.")
-        
         cursor = connection.cursor()
 
         query = "SELECT property_id FROM active_properties WHERE user_id = %s;"
@@ -76,10 +69,8 @@ async def load_active_property_id_db_2(user_id):
 
         if result:
             property_id = result[0]
-            print(f"Active property ID for user {user_id}: {property_id}")
             return property_id
         else:
-            print(f"No active property ID found for user {user_id}.")
             return None
     except Error as e:
         logger.error(f"Error: {e}")
@@ -104,7 +95,6 @@ def update_user_state(user_id, last_house_id):
 
         cursor.execute(query, values)
         connection.commit()
-        print(f"Updated user state for user {user_id} with last house ID {last_house_id}.")
     except Error as e:
         print(f"Error: {e}")
     finally:
@@ -123,10 +113,8 @@ def get_user_last_house(user_id):
 
         if result:
             last_house_id = result[0]
-            logger.info(f"Retrieved last house ID for user {user_id}: {last_house_id}")
             return last_house_id
         else:
-            logger.info(f"No house ID found for user {user_id}.")
             return None
     except Error as e:
         logger.error(f"Error: {e}")
@@ -136,27 +124,23 @@ def get_user_last_house(user_id):
             cursor.close()
             connection.close()
 
+# def token_cleanup():
+#     try:
+#         connection = get_connection()
+#         cursor = connection.cursor()
+#         query = "DELETE FROM user_tokens WHERE expires_at < NOW()"
+#         cursor.execute(query)
+#         connection.commit()
+#     except Error as e:
+#         print(f"Error: {e}")
+#     finally:
+#         if connection.is_connected():
+#             cursor.close()
+#             connection.close()
 
+#     threading.Timer(86400, token_cleanup).start()
 
-def token_cleanup():
-    try:
-        connection = get_connection()
-        cursor = connection.cursor()
-        
-        query = "DELETE FROM user_tokens WHERE expires_at < NOW()"
-        cursor.execute(query)
-        connection.commit()
-        print("Expired tokens cleaned up.")
-    except Error as e:
-        print(f"Error: {e}")
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-    threading.Timer(86400, token_cleanup).start()
-
-token_cleanup()
+# token_cleanup()
 
 def generate_token():
     characters = string.ascii_letters + string.digits
@@ -186,10 +170,6 @@ def add_user_token(user_id, token):
 def get_user_token(user_id):
     try:
         connection = get_connection()
-        if connection is None:
-            print("Failed to connect to the database")
-            return None
-
         cursor = connection.cursor()
 
         query = """
@@ -202,10 +182,8 @@ def get_user_token(user_id):
 
         if token_info:
             token = token_info[0]
-            print(f"Retrieved token for user {user_id}: {token}")
             return token
         else:
-            print(f"No valid token found for user {user_id}.")
             return None
     except Error as e:
         print(f"Error: {e}")
@@ -215,21 +193,17 @@ def get_user_token(user_id):
             cursor.close()
             connection.close()
 
-
 def check_user_token(user_id, token):
     try:
         connection = get_connection()
         cursor = connection.cursor()
-        
         query = "SELECT * FROM user_tokens WHERE user_id = %s AND token = %s AND expires_at > NOW()"
         cursor.execute(query, (user_id, token))
         token_info = cursor.fetchone()
         
         if token_info:
-            print("Token is valid.")
             return True
         else:
-            print("Token is invalid or expired.")
             return False
     except Error as e:
         print(f"Error: {e}")
@@ -246,7 +220,6 @@ def insert_house(address):
         query = "INSERT INTO houses (address) VALUES (%s)"
         cursor.execute(query, (address,))
         connection.commit()
-        print("House inserted successfully.")
     except Error as e:
         print(f"Error: {e}")
     finally:
@@ -264,7 +237,6 @@ def insert_property(house_id, number, area, type, ownership_form, cadastral_numb
         """
         cursor.execute(query, (house_id, number, area, type, ownership_form, cadastral_number, ownership_doc, general_comment))
         connection.commit()
-        print("Property inserted successfully.")
     except Error as e:
         print(f"Error: {e}")
     finally:
@@ -279,7 +251,6 @@ def insert_owner(property_id, fio, birth_date, share, comment):
         query = "INSERT INTO owners (property_id, fio, birth_date, share, comment) VALUES (%s, %s, %s, %s, %s)"
         cursor.execute(query, (property_id, fio, birth_date, share, comment))
         connection.commit()
-        print("Owner inserted successfully.")
     except Error as e:
         print(f"Error: {e}")
     finally:
@@ -291,7 +262,6 @@ def get_general_comment_by_property_id(property_id):
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
-        
         query = "SELECT general_comment FROM properties WHERE id = %s"
         cursor.execute(query, (property_id,))
         result = cursor.fetchone()
@@ -332,7 +302,6 @@ def insert_general_comment(property_id, comment):
             cursor.close()
             connection.close()
 
-
 def insert_comment(owner_id, property_id, comment, is_general):
     try:
         connection = get_connection()
@@ -362,9 +331,7 @@ def insert_comment(owner_id, property_id, comment, is_general):
             WHERE id = %s
             """
             cursor.execute(query, (comment, comment, owner_id))
-
         connection.commit()
-
         if cursor.rowcount == 0:
             logger.warning("No rows were affected by the update.")
         else:
@@ -385,7 +352,6 @@ def get_all_houses():
         query = "SELECT * FROM houses"
         cursor.execute(query)
         houses = cursor.fetchall()
-        print(f"Fetched houses: {houses}")
         return houses
     except Error as e:
         print(f"Error: {e}")
@@ -401,7 +367,6 @@ def get_properties_by_house_id(house_id):
         query = "SELECT * FROM properties WHERE house_id = %s"
         cursor.execute(query, (house_id,))
         properties = cursor.fetchall()
-        print(f"Fetched properties for house_id {house_id}: {properties}")
         return properties
     except Error as e:
         print(f"Error: {e}")
@@ -508,8 +473,6 @@ def get_property_by_id(property_id):
         if connection.is_connected():
             cursor.close()
             connection.close()
-
-
 
 def get_owners_by_property_id(property_id):
     try:
