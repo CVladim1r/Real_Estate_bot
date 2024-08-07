@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS houses (
     address VARCHAR(255) NOT NULL
 );
 
+
 CREATE TABLE IF NOT EXISTS properties (
     id INT AUTO_INCREMENT PRIMARY KEY,
     house_id INT NOT NULL,

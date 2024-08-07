@@ -153,15 +153,10 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
     property_info = get_property_by_number(property_id)
 
     owners = get_owners_by_property_id(property_id)
-
-
     response_text = (
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
-        #f"**Форма собственности:** {property_info['ownership_form']}\n"
-        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
             f" - {owner[2]}, дата рождения: {owner[3]}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"

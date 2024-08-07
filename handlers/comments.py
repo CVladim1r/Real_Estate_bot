@@ -4,7 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import StateFilter
 import logging
 
-from database.queries import (get_properties_by_user_id, 
+from ..database.queries import (get_properties_by_user_id, 
                               insert_general_comment, 
                               insert_comment, 
                               get_comments_by_property_id, 
