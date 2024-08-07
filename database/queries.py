@@ -8,7 +8,7 @@ import logging
 
 from config import config_data
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_connection():
@@ -33,7 +33,6 @@ def execute_query(query, params=None, fetchone=False):
         connection.commit()
         return result
     except Error as e:
-        print(f"Error executing query: {e}")
         return None
     finally:
         if cursor is not None:
@@ -70,7 +69,6 @@ def update_user_state(user_id, last_house_id):
 
         cursor.execute(query, values)
         connection.commit()
-        print(f"Updated user state for user {user_id} with last house ID {last_house_id}.")
     except Error as e:
         print(f"Error: {e}")
     finally:
@@ -89,39 +87,16 @@ def get_user_last_house(user_id):
 
         if result:
             last_house_id = result[0]
-            print(f"Retrieved last house ID for user {user_id}: {last_house_id}")
             return last_house_id
         else:
-            print(f"No house ID found for user {user_id}.")
             return None
     except Error as e:
-        print(f"Error: {e}")
         return None
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
 
-
-def token_cleanup():
-    try:
-        connection = get_connection()
-        cursor = connection.cursor()
-        
-        query = "DELETE FROM user_tokens WHERE expires_at < NOW()"
-        cursor.execute(query)
-        connection.commit()
-        print("Expired tokens cleaned up.")
-    except Error as e:
-        print(f"Error: {e}")
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-    threading.Timer(86400, token_cleanup).start()
-
-token_cleanup()
 
 def generate_token():
     characters = string.ascii_letters + string.digits
@@ -159,10 +134,8 @@ def get_user_token(user_id):
 
         if token_info:
             token = token_info[0]
-            print(f"Retrieved token for user {user_id}: {token}")
             return token
         else:
-            print(f"No valid token found for user {user_id}.")
             return None
     except Error as e:
         print(f"Error: {e}")
@@ -254,35 +227,32 @@ def get_general_comment_by_property_id(property_id):
         result = cursor.fetchone()
         
         if result:
-            return result.get('general_comment', 'Отсутсвует')
+            return result.get('general_comment', 'Отсутствует')
         else:
-            return 'Отсутсвует'
+            return 'Отсутствует'
     except Error as e:
-        print(f"Error: {e}")
-        return 'Отсутсвует'
+        logger.error(f"Error: {e}")
+        return 'Отсутствует'
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
+            
 def insert_general_comment(property_id, new_comment):
     try:
         connection = get_connection()
         cursor = connection.cursor()
 
-        # Fetch existing general comment
         cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
         result = cursor.fetchone()
         
         existing_comment = result[0] if result else ""
         
-        # Append the new comment to the existing comment
         if existing_comment:
             updated_comment = existing_comment + ", " + new_comment
         else:
             updated_comment = new_comment
         
-        # Update the property with the new combined comment
         query = """
         UPDATE properties
         SET general_comment = %s
@@ -291,14 +261,13 @@ def insert_general_comment(property_id, new_comment):
         cursor.execute(query, (updated_comment, property_id))
         connection.commit()
 
-        print("General comment updated successfully.")
+        logger.info("General comment updated successfully.")
     except Error as e:
-        print(f"Error in insert_general_comment: {e}")
+        logger.error(f"Error in insert_general_comment: {e}")
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
 
 
 def insert_comment(owner_id, property_id, new_comment, is_general):
@@ -307,18 +276,7 @@ def insert_comment(owner_id, property_id, new_comment, is_general):
         cursor = connection.cursor()
 
         if is_general:
-            cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
-            result = cursor.fetchone()
-            
-            existing_comment = result[0] if result else ""
-            
-            if existing_comment:
-                updated_comment = existing_comment + ", " + new_comment
-            else:
-                updated_comment = new_comment
-            
-            query = "UPDATE properties SET general_comment = %s WHERE id = %s"
-            cursor.execute(query, (updated_comment, property_id))
+            insert_general_comment(property_id, new_comment)
         else:
             cursor.execute("SELECT comment FROM owners WHERE id = %s", (owner_id,))
             result = cursor.fetchone()
@@ -332,20 +290,19 @@ def insert_comment(owner_id, property_id, new_comment, is_general):
             
             query = "UPDATE owners SET comment = %s WHERE id = %s"
             cursor.execute(query, (updated_comment, owner_id))
+            connection.commit()
 
-        connection.commit()
-
-        if cursor.rowcount == 0:
-            logger.warning("No rows were affected by the update.")
-        else:
-            logger.info("Comment updated successfully.")
+            if cursor.rowcount == 0:
+                logger.warning("No rows were affected by the update.")
+            else:
+                logger.info("Comment updated successfully.")
     except Error as e:
         logger.error(f"Error in insert_comment: {e}")
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
+            
 def get_all_houses():
     try:
         connection = get_connection()
@@ -602,3 +559,20 @@ def save_properties_by_user_id(user_id, property_id):
         if connection.is_connected():
             cursor.close()
             connection.close()
+            
+
+def save_active_owner_id_db(user_id, last_owner_id):
+    query = """
+    INSERT INTO user_last_owner (user_id, last_owner_id)
+    VALUES (%s, %s)
+    ON DUPLICATE KEY UPDATE last_owner_id = VALUES(last_owner_id);
+    """
+    logger.debug(f"Executing query to save owner ID: {query} with params {user_id}, {last_owner_id}")
+    execute_query(query, (user_id, last_owner_id))
+
+def load_active_owner_id_db(user_id):
+    query = "SELECT last_owner_id FROM user_last_owner WHERE user_id = %s;"
+    result = execute_query(query, (user_id,), fetchone=True)
+    if result:
+        return result['last_owner_id']
+    return None

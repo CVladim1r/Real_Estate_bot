@@ -66,6 +66,7 @@ def get_owners_buttons(owners):
             share = owner[4] 
             text = f"{fio}"
             callback_data = f"owner_{owner_id}"
+            
 
             builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
         except IndexError as e:

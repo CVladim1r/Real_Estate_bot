@@ -8,7 +8,23 @@ from aiogram.filters import StateFilter
 
 from .file import *
 from keyboards.inline import get_back_button, get_houses_buttons, get_properties_buttons, get_comment_buttons, get_owners_buttons
-from database.queries import save_properties_by_user_id, update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
+from database.queries import (
+    load_active_owner_id_db,
+    save_active_owner_id_db, 
+    save_properties_by_user_id, 
+    update_user_state, 
+    get_user_last_house, 
+    load_active_property_id_db, 
+    save_active_property_id_db, 
+    get_owners_by_property_id, 
+    get_property_id_by_number_and_house, 
+    get_user_token, 
+    get_all_houses, 
+    get_properties_by_house_id, 
+    get_property_by_number, 
+    insert_comment, 
+    add_user_token
+)
 
 router = Router()
 
@@ -16,12 +32,21 @@ class PropertyState(StatesGroup):
     selecting_house = State()
     selecting_property = State()
     showing_property_info = State()
-    awaiting_comment = State()
+    awaiting_user_comment = State()
+    awaiting_general_comment = State()
     awaiting_token = State()
     active_property_id = State()
     selecting_owner = State()
 
 user_tokens = {}
+
+def escape_markdown(text: str) -> str:
+    if text is None:
+        return ""
+    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in escape_chars:
+        text = text.replace(char, f'\\{char}')
+    return text
 
 def generate_token():
     return secrets.token_hex(8)
@@ -109,10 +134,10 @@ async def process_property_number(message: types.Message, state: FSMContext):
     logger.debug(f"Fetched property info: {property_info}")
 
     user_id = message.from_user.id
-    save_properties_by_user_id(user_id, property_id)  # Save the property for the user
+    save_active_property_id_db(user_id, property_id)
 
     await state.update_data(property_number=property_number, property_info=property_info, active_property_id=property_id)
-    save_active_property_id_db(user_id, property_id)  # This might be redundant if save_properties_by_user_id already handles it
+    save_active_property_id(user_id, property_id)
     logger.debug(f"State updated with active_property_id: {property_id}")
 
     owners = get_owners_by_property_id(property_id)
@@ -127,10 +152,10 @@ async def process_property_number(message: types.Message, state: FSMContext):
         f"**Тип помещения:** {property_info['type']}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y') if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
+            f" - {owner[2]}, дата рождения: {owner[3] if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
             for owner in owners
         )
-        + '\n'
+        + '\n\n'
         + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
     )
     await state.update_data(property_number=property_number, property_info=property_info, active_property_id=property_id)
@@ -142,7 +167,6 @@ async def process_property_number(message: types.Message, state: FSMContext):
 @router.callback_query(lambda call: call.data == "back")
 async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
     user_id = callback_query.message.from_user.id
-
     saved_user_id, property_id = load_active_property_id_db(user_id)
     
     if saved_user_id != user_id or property_id is None:
@@ -151,35 +175,77 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
         return
 
     property_info = get_property_by_number(property_id)
-
     owners = get_owners_by_property_id(property_id)
-
-
+    
+    
     response_text = (
-        f"**Номер помещения:** {property_info['number']}\n"
+        f"**Номер помещения:** {escape_markdown(str(property_info['number']))}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
-        f"**Тип помещения:** {property_info['type']}\n"
-        #f"**Форма собственности:** {property_info['ownership_form']}\n"
-        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
+        f"**Тип помещения:** {escape_markdown(property_info['type'])}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner[2]}, дата рождения: {owner[3]}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
-            for owner in owners
+            f" - {escape_markdown(owner[2])}, дата рождения: {owner[3] if isinstance(owner[3], str) else owner[3]}, доля: {owner[4]}м/кв2, комментарий: {escape_markdown(owner[5])}"
+            for owner in owners 
         )
-        + '\n'
-        + f"**Общий комментарий:** {property_info.get('general_comment', 'Отсутсвует')}\n"
+        + '\n\n'
+        + f"**Общий комментарий:** {escape_markdown(property_info['general_comment'])}\n"
     )
-
+    
     await callback_query.message.answer(response_text, parse_mode='Markdown')
     await state.set_state(PropertyState.showing_property_info)
     await callback_query.message.answer("Выберите действие:", reply_markup=get_comment_buttons(property_info))
 
+
+@router.callback_query(lambda call: call.data.startswith("comment_owner_"))
+async def select_owner(call: types.CallbackQuery, state: FSMContext):
+    try:
+        user_id = call.from_user.id
+        data_parts = call.data.split("_")
+        
+        if len(data_parts) < 3:
+            raise ValueError(f"Invalid callback data format: {call.data}")
+
+        owner_id_str = data_parts[2]
+        
+        if owner_id_str == 'unknown':
+            owner_id_str = load_active_owner_id_db(user_id)
+            if owner_id_str is None:
+                raise ValueError(f"No active owner ID found for user ID: {user_id}")
+
+        owner_id = int(owner_id_str)
+        save_active_owner_id_db(user_id, owner_id)
+        await state.update_data(owner_id=owner_id, is_general=False)
+        logger.info(f"Selected owner ID: {owner_id} for user ID: {user_id}")
+
+        await call.message.answer("Введите ваш комментарий для владельца:")
+        await state.set_state(PropertyState.awaiting_user_comment)
+        
+    except Exception as e:
+        logger.error(f"Error in select_owner: {e}")
+        await call.message.answer("Произошла ошибка. Попробуйте снова.")
+
+@router.callback_query(lambda call: call.data == "comment_general")
+async def select_general_comment(call: types.CallbackQuery, state: FSMContext):
+    try:
+        await state.update_data(is_general=True)
+        await call.message.answer("Введите ваш общий комментарий для объекта:")
+        await state.set_state(PropertyState.awaiting_general_comment)
+    except Exception as e:
+        logger.error(f"Error in select_general_comment: {e}")
+        await call.message.answer("Произошла ошибка. Попробуйте снова.")
+
+
 @router.callback_query(lambda call: call.data.startswith("comment_owner_") or call.data == "comment_general")
 async def process_comment_selection(callback_query: types.CallbackQuery, state: FSMContext):
-    await state.update_data(comment_target=callback_query.data)
-    await state.set_state(PropertyState.awaiting_comment)
-    await callback_query.message.answer("Введите ваш комментарий:")
+    try:
+        if callback_query.data == "comment_general":
+            await state.set_state(PropertyState.awaiting_general_comment)
+        else:
+            await state.set_state(PropertyState.awaiting_user_comment)
+        await callback_query.message.answer("Введите ваш комментарий:")
+    except Exception as e:
+        logger.error(f"Error in process_comment_selection: {e}")
+        await callback_query.message.answer("Произошла ошибка. Попробуйте снова.")
 
 @router.callback_query(lambda call: call.data == 'back_to_houses')
 async def back_to_houses(callback_query: types.CallbackQuery, state: FSMContext):
@@ -189,17 +255,22 @@ async def back_to_houses(callback_query: types.CallbackQuery, state: FSMContext)
     await callback_query.message.edit_text("Выберите дом или введите адрес:", reply_markup=get_houses_buttons(houses))
 
 @router.callback_query(lambda call: call.data == 'back_to_properties')
-async def back_to_properties(callback_query: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    user_id = callback_query.message.from_user.id
-    house_id = get_user_last_house(user_id)
-    if not house_id:
-        house_id = get_user_last_house(user_id)
-    
-    properties = get_properties_by_house_id(house_id)
-    logger.debug(f"Returning to property selection for house ID: {house_id}, fetched properties: {properties}")
-    await state.set_state(PropertyState.selecting_property)
-    await callback_query.message.edit_text("Выберите квартиру или введите номер:", reply_markup=get_properties_buttons(properties))
+async def back_to_properties(call: types.CallbackQuery, state: FSMContext):
+    try:
+        data = await state.get_data()
+        house_id = data.get('house_id')
+        if house_id is None:
+            await call.message.answer("Ошибка: идентификатор дома не указан.")
+            return
+
+        properties = get_properties_by_house_id(house_id)
+        if not properties:
+            await call.message.answer("Нет квартир для отображения.")
+        else:
+            await call.message.edit_text("Выберите квартиру:", reply_markup=get_properties_buttons(properties))
+    except Exception as e:
+        logger.error(f"Error in back_to_properties: {e}")
+        await call.message.answer("Произошла ошибка при возврате к списку квартир. Попробуйте снова.")
 
 @router.callback_query(lambda call: call.data.startswith("page_"))
 async def paginate_houses(callback_query: types.CallbackQuery, state: FSMContext):
@@ -261,7 +332,9 @@ def register_common_handlers(router: Router):
     router.callback_query.register(process_house_selection, lambda call: call.data.startswith("house_"))
     router.message.register(process_house_address, PropertyState.selecting_house)
     router.message.register(process_property_number, PropertyState.selecting_property)
-    router.callback_query.register(process_comment_selection, lambda call: call.data.startswith("comment_owner_") or call.data == "comment_general")
+    router.callback_query.register(select_owner, lambda call: call.data.startswith("comment_owner_"))
+    router.callback_query.register(select_general_comment, lambda call: call.data == "comment_general")
+    #router.callback_query.register(process_comment_selection, lambda call: call.data.startswith("comment_owner_") or call.data == "comment_general")
     router.callback_query.register(back_to_houses, lambda call: call.data == 'back_to_houses')
     router.callback_query.register(back_to_properties, lambda call: call.data == 'back_to_properties')
     router.callback_query.register(paginate_houses, lambda call: call.data.startswith("page_"))
