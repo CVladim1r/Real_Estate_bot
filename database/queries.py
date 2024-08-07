@@ -254,35 +254,32 @@ def get_general_comment_by_property_id(property_id):
         result = cursor.fetchone()
         
         if result:
-            return result.get('general_comment', 'Отсутсвует')
+            return result.get('general_comment', 'Отсутствует')
         else:
-            return 'Отсутсвует'
+            return 'Отсутствует'
     except Error as e:
-        print(f"Error: {e}")
-        return 'Отсутсвует'
+        logger.error(f"Error: {e}")
+        return 'Отсутствует'
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
+            
 def insert_general_comment(property_id, new_comment):
     try:
         connection = get_connection()
         cursor = connection.cursor()
 
-        # Fetch existing general comment
         cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
         result = cursor.fetchone()
         
         existing_comment = result[0] if result else ""
         
-        # Append the new comment to the existing comment
         if existing_comment:
             updated_comment = existing_comment + ", " + new_comment
         else:
             updated_comment = new_comment
         
-        # Update the property with the new combined comment
         query = """
         UPDATE properties
         SET general_comment = %s
@@ -291,14 +288,13 @@ def insert_general_comment(property_id, new_comment):
         cursor.execute(query, (updated_comment, property_id))
         connection.commit()
 
-        print("General comment updated successfully.")
+        logger.info("General comment updated successfully.")
     except Error as e:
-        print(f"Error in insert_general_comment: {e}")
+        logger.error(f"Error in insert_general_comment: {e}")
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
 
 
 def insert_comment(owner_id, property_id, new_comment, is_general):
@@ -307,18 +303,7 @@ def insert_comment(owner_id, property_id, new_comment, is_general):
         cursor = connection.cursor()
 
         if is_general:
-            cursor.execute("SELECT general_comment FROM properties WHERE id = %s", (property_id,))
-            result = cursor.fetchone()
-            
-            existing_comment = result[0] if result else ""
-            
-            if existing_comment:
-                updated_comment = existing_comment + ", " + new_comment
-            else:
-                updated_comment = new_comment
-            
-            query = "UPDATE properties SET general_comment = %s WHERE id = %s"
-            cursor.execute(query, (updated_comment, property_id))
+            insert_general_comment(property_id, new_comment)
         else:
             cursor.execute("SELECT comment FROM owners WHERE id = %s", (owner_id,))
             result = cursor.fetchone()
@@ -332,20 +317,19 @@ def insert_comment(owner_id, property_id, new_comment, is_general):
             
             query = "UPDATE owners SET comment = %s WHERE id = %s"
             cursor.execute(query, (updated_comment, owner_id))
+            connection.commit()
 
-        connection.commit()
-
-        if cursor.rowcount == 0:
-            logger.warning("No rows were affected by the update.")
-        else:
-            logger.info("Comment updated successfully.")
+            if cursor.rowcount == 0:
+                logger.warning("No rows were affected by the update.")
+            else:
+                logger.info("Comment updated successfully.")
     except Error as e:
         logger.error(f"Error in insert_comment: {e}")
     finally:
         if connection.is_connected():
             cursor.close()
             connection.close()
-
+            
 def get_all_houses():
     try:
         connection = get_connection()

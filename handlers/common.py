@@ -1,5 +1,6 @@
 import secrets
 import datetime
+import logging
 from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -8,7 +9,10 @@ from aiogram.filters import StateFilter
 
 from .file import *
 from keyboards.inline import get_back_button, get_houses_buttons, get_properties_buttons, get_comment_buttons, get_owners_buttons
-from database.queries import save_properties_by_user_id, update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, add_user_token
+from database.queries import save_properties_by_user_id, update_user_state, get_user_last_house, load_active_property_id_db, save_active_property_id_db, get_owners_by_property_id, get_property_id_by_number_and_house, get_user_token, get_all_houses, get_properties_by_house_id, get_property_by_number, insert_comment, insert_general_comment, add_user_token
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -120,14 +124,13 @@ async def process_property_number(message: types.Message, state: FSMContext):
     if not owners:
         await message.answer("Собственники не найдены. Попробуйте снова.")
         return
-
     response_text = (
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner[2]}, дата рождения: {owner[3].strftime('%d.%m.%Y') if owner[3] else 'Не указана'}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
+            f" - {owner['fio']}, дата рождения: {owner['birth_date'].strftime('%d.%m.%Y') if owner['birth_date'] else 'Не указана'}, доля: {owner['share']}м/кв2, комментарий: {owner['comment']}"
             for owner in owners
         )
         + '\n'
@@ -154,17 +157,13 @@ async def go_back(callback_query: types.CallbackQuery, state: FSMContext):
 
     owners = get_owners_by_property_id(property_id)
 
-
     response_text = (
         f"**Номер помещения:** {property_info['number']}\n"
         f"**Площадь:** {property_info['area']} кв.м.\n"
         f"**Тип помещения:** {property_info['type']}\n"
-        #f"**Форма собственности:** {property_info['ownership_form']}\n"
-        #f"**Кадастровый номер:** {property_info.get('cadastral_number', 'Не указан')}\n"
-        #f"**Документ о праве собственности:** {property_info.get('ownership_doc', 'Не указан')}\n"
         f"**Собственники:**\n"
         + '\n'.join(
-            f" - {owner[2]}, дата рождения: {owner[3]}, доля: {owner[4]}м/кв2, комментарий: {owner[5]}"
+            f" - {owner['fio']}, дата рождения: {owner['birth_date']}, доля: {owner['share']}м/кв2, комментарий: {owner['comment']}"
             for owner in owners
         )
         + '\n'
@@ -248,7 +247,6 @@ async def paginate_properties(callback_query: types.CallbackQuery, state: FSMCon
         
         properties_page = properties[start_index:end_index]
 
-
         await callback_query.message.edit_reply_markup(reply_markup=get_properties_buttons(properties, current_page))
 
     except Exception as e:
@@ -266,4 +264,5 @@ def register_common_handlers(router: Router):
     router.callback_query.register(back_to_properties, lambda call: call.data == 'back_to_properties')
     router.callback_query.register(paginate_houses, lambda call: call.data.startswith("page_"))
     router.callback_query.register(paginate_properties, lambda call: call.data.startswith("properties_next_") or call.data.startswith("properties_prev_"))
-    router.include_router(router)
+
+register_common_handlers(router)

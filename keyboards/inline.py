@@ -25,7 +25,7 @@ def get_houses_buttons(houses, current_page=0):
 
 def get_comment_buttons(property_info):
     buttons = [
-        [InlineKeyboardButton(text="Добавить комментарий", callback_data="comment_general")],
+        [InlineKeyboardButton(text="Добавить общий комментарий", callback_data="comment_general")],
     ]
     for i, owner in enumerate(property_info['owners'], start=1):
         buttons.append([InlineKeyboardButton(text=f"Комментарий владельцу {i}", callback_data=f"comment_owner_{i}")])
@@ -62,16 +62,14 @@ def get_owners_buttons(owners):
     for owner in owners:
         try:
             owner_id = owner[0]
-            fio = owner[2]  
-            share = owner[4] 
+            fio = owner[2]
             text = f"{fio}"
             callback_data = f"owner_{owner_id}"
-
             builder.add(InlineKeyboardButton(text=text, callback_data=callback_data))
         except IndexError as e:
-            print(f"IndexError: {e} - owner data: {owner}")
+            logger.error(f"IndexError: {e} - owner data: {owner}")
         except Exception as e:
-            print(f"Exception: {e} - owner data: {owner}")
+            logger.error(f"Exception: {e} - owner data: {owner}")
 
     builder.add(InlineKeyboardButton(text="Оставить общий комментарий", callback_data="comment_general"))
     builder.add(InlineKeyboardButton(text="Вернуться к выбору квартиры", callback_data="back_to_properties"))
@@ -80,7 +78,6 @@ def get_owners_buttons(owners):
     builder.adjust(1)
 
     return builder.as_markup()
-
 
 def get_back_button():
     builder = InlineKeyboardBuilder()
