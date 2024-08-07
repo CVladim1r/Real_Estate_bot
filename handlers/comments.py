@@ -11,7 +11,6 @@ from database.queries import (get_properties_by_user_id,
                               get_properties_by_house_id,
                               save_properties_by_user_id)
 from keyboards.inline import get_owners_buttons, get_comment_buttons, get_properties_buttons, get_back_button
-
 from .common import PropertyState
 
 router = Router()
